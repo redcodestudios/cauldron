@@ -5,6 +5,7 @@ extern crate serde;
 
 use std::env;
 use std::net::UdpSocket;
+use std::convert::TryInto;
 
 #[derive(Serialize, Deserialize)]
 struct DNSMessage {
@@ -48,12 +49,16 @@ fn get_ip(cname: String, dns_server: String) {
     let id = (0b00000000, 0b00000001);
     let codes = (0b00000001, 0b00000000);
     let question_qtd = (0b00000000, 0b00000001);
+    let qtype = (0b00000000, 0b00000001);
+    let qclass = (0b00000000, 0b00000001);
+
     let mut bytes = vec![id.0, id.1 , codes.0,codes.1, question_qtd.0, question_qtd.1];
 
-    let labels = transform_cname(cname);
+    //let labels = transform_cname(cname);
 
     let one_flag: u16 = 0x0001;
-    let mut cname_bytes = bincode::serialize(&labels).unwrap();
+    //let mut cname_bytes = bincode::serialize(&labels).unwrap();
+    let mut cname_bytes = test(cname);
     let mut qtype_bytes = bincode::serialize(&one_flag).unwrap();
     let mut qclass_bytes = bincode::serialize(&one_flag).unwrap();
 
@@ -64,6 +69,10 @@ fn get_ip(cname: String, dns_server: String) {
     questions_bytes.append(&mut qclass_bytes);
 
     bytes.append(&mut questions_bytes);
+    bytes.push(qtype.0);
+    bytes.push(qtype.1);
+    bytes.push(qclass.0);
+    bytes.push(qclass.1);
     // let bytes:Vec<u8> = bincode::serialize(&message).unwrap();
    
     socket
@@ -133,4 +142,18 @@ fn transform_cname(cname: String) -> String {
     }
     labels.push_str(&String::from("0"));
     labels
+}
+
+fn test(cname: String) -> Vec<u8> {
+    let split = cname.split(".");
+    let mut bytes = vec![];
+
+    for s in split {
+        let size = s.len().try_into().unwrap();
+
+        bytes.push(size);
+        bytes.append(&mut String::from(s.clone()).into_bytes());
+    }
+
+    bytes
 }
