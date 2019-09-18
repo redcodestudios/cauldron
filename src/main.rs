@@ -46,7 +46,7 @@ fn get_ip(cname: String, dns_server: String) {
     let socket = UdpSocket::bind("0.0.0.0:34254").expect("couldn't bind to address");
     // socket.connect(dns_server+":5005").expect("couldn't connect to address");
     // let message = build_message(cname);
-    let id = (0b00000000, 0b00000001);
+    let id = (0x67, 0xac);
     let codes = (0b00000001, 0b00000000);
     let question_qtd = (0b00000000, 0b00000001);
     let qtype = (0b00000000, 0b00000001);
@@ -54,26 +54,24 @@ fn get_ip(cname: String, dns_server: String) {
 
     let mut bytes = vec![id.0, id.1 , codes.0,codes.1, question_qtd.0, question_qtd.1];
 
-    //let labels = transform_cname(cname);
 
-    let one_flag: u16 = 0x0001;
-    //let mut cname_bytes = bincode::serialize(&labels).unwrap();
     let mut cname_bytes = test(cname);
-    let mut qtype_bytes = bincode::serialize(&one_flag).unwrap();
-    let mut qclass_bytes = bincode::serialize(&one_flag).unwrap();
 
-    let mut questions_bytes = vec![0; cname_bytes.len() + 4];
+    // let mut questions_bytes = vec![0; cname_bytes.len()];
 
-    questions_bytes.append(&mut cname_bytes);
-    questions_bytes.append(&mut qtype_bytes);
-    questions_bytes.append(&mut qclass_bytes);
+    // questions_bytes.append(&mut cname_bytes);
 
-    bytes.append(&mut questions_bytes);
+    bytes.push(qtype.0);
+    bytes.push(qtype.0);
+    bytes.push(qtype.0);
+    bytes.push(qtype.0);
+    bytes.push(qtype.0);
+    bytes.push(qtype.0);
+    bytes.append(&mut cname_bytes);
     bytes.push(qtype.0);
     bytes.push(qtype.1);
     bytes.push(qclass.0);
     bytes.push(qclass.1);
-    // let bytes:Vec<u8> = bincode::serialize(&message).unwrap();
    
     socket
         .send_to(&mut bytes, dns_server)
@@ -154,6 +152,6 @@ fn test(cname: String) -> Vec<u8> {
         bytes.push(size);
         bytes.append(&mut String::from(s.clone()).into_bytes());
     }
-
+    bytes.push(0b00000000);
     bytes
 }
