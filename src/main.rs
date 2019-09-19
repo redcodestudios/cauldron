@@ -72,13 +72,30 @@ fn get_ip(cname: String, dns_server: String) {
     bytes.push(qtype.1);
     bytes.push(qclass.0);
     bytes.push(qclass.1);
-   
+
     socket
         .send_to(&mut bytes, dns_server)
         .expect("couldn't send data");
     let mut buf = [0; 1024];
     match socket.recv(&mut buf) {
-        Ok(received) => println!("received {} bytes {:?}", received, &buf[..received]),
+        Ok(received) => {
+            let tmp_buff = &buf[..received];
+            let answer_type_pos = bytes.len() + 3;
+            let answer_type = (tmp_buff[answer_type_pos], tmp_buff[answer_type_pos+1]);
+
+            if answer_type.0 + answer_type.1 == 1 {
+                let answer_pos = answer_type_pos + 9;
+                let answer = (
+                    tmp_buff[answer_pos],
+                    tmp_buff[answer_pos + 1],
+                    tmp_buff[answer_pos + 2],
+                    tmp_buff[answer_pos + 3]
+                );
+               
+                println!("{}.{}.{}.{}", answer.0, answer.1, answer.2, answer.3);
+            }
+
+        },
         Err(e) => println!("recv function failed: {:?}", e),
     }
 }
