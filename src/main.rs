@@ -7,6 +7,24 @@ use std::env;
 use std::net::UdpSocket;
 use std::convert::TryInto;
 
+
+// bytes
+const HEADER_SECTION_SIZE: usize = 32; 
+
+const ID_SIZE: usize = 2;
+const FLAGS_SIZE: usize = 2;
+const QDCOUNT_SIZE: usize = 2;
+const ANCOUNT_SIZE:usize = 2;
+const QTYPE_SIZE: usize = 2; 
+const QCLASS_SIZE: usize = 2;
+const NAME_SIZE: usize = 2;
+const TYPE_SIZE: usize = 2;
+const CLASS_SIZE: usize = 2;
+const TTL_SIZE: usize = 4;
+const DATA_LENGTH_SIZE: usize = 2;
+const ADDRESS_SIZE: usize = 4;
+
+
 #[derive(Serialize, Deserialize)]
 struct DNSMessage {
     header: Vec<u8>,
@@ -85,20 +103,21 @@ fn get_ip(cname: String, dns_server: String) {
     match socket.recv(&mut buf) {
         Ok(received) => {
             let tmp_buff = &buf[..received];
-            let answer_type_pos = bytes.len() + 3;
-            let answer_type = (tmp_buff[answer_type_pos], tmp_buff[answer_type_pos+1]);
+            //let answer_type_pos = bytes.len() + 3;
+            //let answer_type = (tmp_buff[answer_type_pos], tmp_buff[answer_type_pos+1]);
 
-            if answer_type.0 + answer_type.1 == 1 {
-                let answer_pos = answer_type_pos + 9;
-                let answer = (
-                    tmp_buff[answer_pos],
-                    tmp_buff[answer_pos + 1],
-                    tmp_buff[answer_pos + 2],
-                    tmp_buff[answer_pos + 3]
-                );
+            //if answer_type.0 + answer_type.1 == 1 {
+              //  let answer_pos = answer_type_pos + 9;
+                //let answer = (
+                  //  tmp_buff[answer_pos],
+                   // tmp_buff[answer_pos + 1],
+                    //tmp_buff[answer_pos + 2],
+                    //tmp_buff[answer_pos + 3]
+                //);
                
-                println!("{}.{}.{}.{}", answer.0, answer.1, answer.2, answer.3);
-            }
+                //println!("{}.{}.{}.{}", answer.0, answer.1, answer.2, answer.3);
+                println!("{}", deserialize_dns_answer(tmp_buff.to_vec()))
+            //}
 
         },
         Err(e) => println!("recv function failed: {:?}", e),
@@ -119,3 +138,48 @@ fn transform_cname(cname: String) -> Vec<u8> {
     bytes.push(0b00000000);
     return bytes;
 }
+
+fn deserialize_dns_answer(bytes: Vec<u8>) -> String {
+    let mut pos = ID_SIZE + FLAGS_SIZE + QDCOUNT_SIZE;
+    let answers_count = bytes[pos] + bytes[pos+1];
+   
+    println!("id {}", (bytes[0] + bytes[ID_SIZE-1]));
+    println!("aaaa {}", answers_count);
+    
+    pos = HEADER_SECTION_SIZE - 1;
+    println!("aaaa {}", pos);
+    let mut b = bytes[pos]; 
+    
+    while b !=0 || pos < HEADER_SECTION_SIZE {
+        println!("aaaa {}", pos);
+        pos+=1;
+        b = bytes[pos];
+    }
+    pos+=1; //skip null cname terminator
+    pos+= QTYPE_SIZE + QCLASS_SIZE; //jump to answer section
+
+    let mut result = String::from("");
+
+    for _ in 0..answers_count {
+        pos += NAME_SIZE;
+        let answer_type = (bytes[pos], bytes[pos+1]);
+        
+        // join two bytes of type and chkeck if is type A
+        if (answer_type.0 + answer_type.1) == 1 {
+            pos += TYPE_SIZE + CLASS_SIZE + TTL_SIZE + DATA_LENGTH_SIZE;
+            let answer = (bytes[pos], bytes[pos+1], bytes[pos+2], bytes[pos+3]);
+            result.push_str(
+                format!(
+                    "{}.{}.{}.{}",
+                    answer.0,
+                    answer.1,
+                    answer.2,
+                    answer.3
+                ).as_str()
+            );
+            pos += ADDRESS_SIZE;
+        }
+    }
+    result
+}
+
