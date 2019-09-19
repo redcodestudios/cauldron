@@ -36,38 +36,43 @@ fn main() {
             }
         }
     }
-
-    // for argument in env::args(){
-    //     println!("{}", argument);
-    // }
 }
 
 fn get_ip(cname: String, dns_server: String) {
     let socket = UdpSocket::bind("0.0.0.0:34254").expect("couldn't bind to address");
-    // socket.connect(dns_server+":5005").expect("couldn't connect to address");
-    // let message = build_message(cname);
-    let id = (0x67, 0xac);
-    let codes = (0b00000001, 0b00000000);
-    let question_qtd = (0b00000000, 0b00000001);
-    let qtype = (0b00000000, 0b00000001);
-    let qclass = (0b00000000, 0b00000001);
 
+
+    // ID for the dns transaction.
+    let id = (0x00, 0x01);
+
+    // Combined flags on two flags.
+    // 16bits in order: 1 QR, 4 OPCode, 1 AA, 1 TC, 1 RD, 1 RA, 1 Z, 1 AD, 1 CD, 4 RCode
+    // We have only recursion desired activated.
+    let codes = (0x01, 0x00);
+
+    // Two bytes for query quantity, we do 1 only.
+    let question_qtd = (0x00, 0x01);
+
+    // Type 1 for A query, looking for host address
+    let qtype = (0x00, 0x01);
+
+    // Type 1 for Internet
+    let qclass = (0x00, 0x01);
+
+    // Join all headers in a vector of bytes to be sent via UDP.
     let mut bytes = vec![id.0, id.1 , codes.0,codes.1, question_qtd.0, question_qtd.1];
 
+    bytes.push(qtype.0);
+    bytes.push(qtype.0);
+    bytes.push(qtype.0);
+    bytes.push(qtype.0);
+    bytes.push(qtype.0);
+    bytes.push(qtype.0);
 
-    let mut cname_bytes = test(cname);
-
-    // let mut questions_bytes = vec![0; cname_bytes.len()];
-
-    // questions_bytes.append(&mut cname_bytes);
-
-    bytes.push(qtype.0);
-    bytes.push(qtype.0);
-    bytes.push(qtype.0);
-    bytes.push(qtype.0);
-    bytes.push(qtype.0);
-    bytes.push(qtype.0);
+    // After all headers we need to insert the name being searched.
+    let mut cname_bytes = transform_cname(cname);
     bytes.append(&mut cname_bytes);
+    
     bytes.push(qtype.0);
     bytes.push(qtype.1);
     bytes.push(qclass.0);
@@ -100,66 +105,7 @@ fn get_ip(cname: String, dns_server: String) {
     }
 }
 
-fn build_message(cname: String) -> DNSMessage {
-    // 0 0000 0 0 0 0 0000
-    let id: u16 = 0b0000000000000001;
-    let codes: u16 = 0b0000000100000000;
-    let qdcount: u16 = 0b0000000000000001;
-    let ancount: u16 = 0b0000000000000000;
-    let nscount: u16 = 0b0000000000000000;
-    let arcount: u16 = 0b0000000000000000;
-
-    let header = HeaderSection {
-        id: id,
-        codes: codes,
-        qdcount: qdcount,
-        ancount: ancount,
-        nscount: nscount,
-        arcount: arcount,
-    };
-
-    let header_bytes = bincode::serialize(&header).unwrap();
-    let labels = transform_cname(cname);
-    println!("{}", labels);
-    // let question_bytes = transform_to_bytes(labels)
-    let one_flag: u16 = 0x0001;
-    let mut cname_bytes = bincode::serialize(&labels).unwrap();
-    let mut qtype_bytes = bincode::serialize(&one_flag).unwrap();
-    let mut qclass_bytes = bincode::serialize(&one_flag).unwrap();
-
-    let mut questions_bytes = vec![0; cname_bytes.len() + 4];
-
-    questions_bytes.append(&mut cname_bytes);
-    questions_bytes.append(&mut qtype_bytes);
-    questions_bytes.append(&mut qclass_bytes);
-
-    // let mut message: Vec<u8> = vec![0; header_bytes.len() + questions_bytes.len()];
-    // message.append(&mut header_bytes);
-    // message.append(&mut questions_bytes);
-
-    let message = DNSMessage {
-        header: header_bytes,
-        payload: questions_bytes,
-        answers_pr: 0,
-        authority_rr: 0,
-        additional_pr: 0,
-    };
-
-    message
-}
-
-fn transform_cname(cname: String) -> String {
-    let split = cname.split(".");
-    let mut labels: String = "".to_owned();
-    for s in split {
-        labels.push_str(&s.len().to_string());
-        labels.push_str(&s);
-    }
-    labels.push_str(&String::from("0"));
-    labels
-}
-
-fn test(cname: String) -> Vec<u8> {
+fn transform_cname(cname: String) -> Vec<u8> {
     let split = cname.split(".");
     let mut bytes = vec![];
 
@@ -169,6 +115,7 @@ fn test(cname: String) -> Vec<u8> {
         bytes.push(size);
         bytes.append(&mut String::from(s.clone()).into_bytes());
     }
+    // The final byte for the cname should be a 0.
     bytes.push(0b00000000);
-    bytes
+    return bytes;
 }
