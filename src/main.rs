@@ -1,12 +1,8 @@
 extern crate bincode;
-#[macro_use]
-extern crate serde_derive;
-extern crate serde;
 
 use std::env;
 use std::net::UdpSocket;
 use std::convert::TryInto;
-
 
 // sizes in bytes
 const HEADER_SECTION_SIZE: usize = 12;
@@ -21,25 +17,6 @@ const CLASS_SIZE: usize = 2;
 const TTL_SIZE: usize = 4;
 const DATA_LENGTH_SIZE: usize = 2;
 
-
-#[derive(Serialize, Deserialize)]
-struct DNSMessage {
-    header: Vec<u8>,
-    payload: Vec<u8>,
-    answers_pr: u32,
-    authority_rr: u32,
-    additional_pr: u32,
-}
-
-#[derive(Serialize, Deserialize)]
-struct HeaderSection {
-    id: u16,
-    codes: u16,
-    qdcount: u16,
-    ancount: u16,
-    nscount: u16,
-    arcount: u16,
-}
 
 fn main() {
     /* Program args should be like
