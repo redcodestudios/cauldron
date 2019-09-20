@@ -60,59 +60,65 @@ fn build_query(cname: String) -> Vec<u8> {
     // Join all headers in a vector of bytes to be sent via UDP.
     let mut bytes = vec![];
 
-    // ID for the dns transaction.
-    let id = (0x00, 0x01);
-    bytes.push(id.0);
-    bytes.push(id.1);
+    // ID for the dns transaction. arbitrarily set to 1.
+    let id = vec![0x00, 0x01];
+    bytes.append(&mut id.clone());
 
-    // Combined flags on two flags.
+    // Combined flags on two bytes.
     // 16bits in order: 1 QR, 4 OPCode, 1 AA, 1 TC, 1 RD, 1 RA, 1 Z, 1 AD, 1 CD, 4 RCode
-    // We have only recursion desired activated.
-    let codes = (0x01, 0x00);
-    bytes.push(codes.0);
-    bytes.push(codes.1);
+    // We have only recursion desired (RD) activated.
+    let codes = vec![0x01, 0x00];
+    bytes.append(&mut codes.clone());
 
     // Two bytes for query quantity, we do 1 query at a time only.
-    let question_qtd = (0x00, 0x01);
-    bytes.push(question_qtd.0);
-    bytes.push(question_qtd.1);
+    let question_qtd = vec![0x00, 0x01];
+    bytes.append(&mut question_qtd.clone());
 
-    bytes.push(0x00);
-    bytes.push(0x00);
-    bytes.push(0x00);
-    bytes.push(0x00);
-    bytes.push(0x00);
-    bytes.push(0x00);
+    // NULL flags to be used in answers by the dns response.
+    let answer_flags = vec![0x00,0x00];
+    // Answer RRs count
+    bytes.append(&mut answer_flags.clone());
+    // Authority RRs count
+    bytes.append(&mut answer_flags.clone());
+    // Adicional RRs count
+    bytes.append(&mut answer_flags.clone());
 
     // After all headers we need to insert the name being searched.
-    let mut cname_bytes = transform_cname_for_query(cname);
-    bytes.append(&mut cname_bytes);
+    let cname_bytes = transform_cname_for_query(cname);
+    bytes.append(&mut cname_bytes.clone());
     
-    // Type 1 for A query, looking for host address
-    let qtype = (0x00, 0x01);
-    bytes.push(qtype.0);
-    bytes.push(qtype.1);
+    // Type 1 for A query, looking for host address.
+    let qtype = vec![0x00, 0x01];
+    bytes.append(&mut qtype.clone());
 
-    // Type 1 for Internet
-    let qclass = (0x00, 0x01);
-    bytes.push(qclass.0);
-    bytes.push(qclass.1);
+    // Type 1 for Internet query.
+    let qclass = vec![0x00, 0x01];
+    bytes.append(&mut qclass.clone());
 
     return bytes;
 }
 
 fn transform_cname_for_query(cname: String) -> Vec<u8> {
+    /* We should break the cname into labels and especify the length of each part
+       ['www', 'google', 'com']
+       should be a vector of bytes like:
+       [3, 'www', 6, 'google', 3, 'com', 0]
+    */
     let split = cname.split(".");
+    
     let mut bytes = vec![];
 
-    for s in split {
+    for s in split {        
         let size = s.len().try_into().unwrap();
 
+        // push the size of the label. ex: 'www', size 3.
         bytes.push(size);
+
+        // push the label: 'www'.
         bytes.append(&mut String::from(s.clone()).into_bytes());
     }
 
-    // The final byte for the cname should be a 0.
+    // insert the terminator 0 to the converted cname.
     bytes.push(0x00);
     return bytes;
 }
