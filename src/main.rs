@@ -42,19 +42,43 @@ struct HeaderSection {
 }
 
 fn main() {
+    /* Program args should be like
+       ./cauldron <cname> <dns_server>
+       ./cauldron fga.unb.br 8.8.8.8
+    */
     if env::args().len() != 3 {
         println!("Invalid arguments!");
     } else {
         if let Some(hostname) = env::args().nth(1) {
             if let Some(dns_server) = env::args().nth(2) {
-                get_ip(hostname, format!("{}:{}", dns_server, 53));
+                send_query(hostname, dns_server, 53);
             }
         }
     }
 }
 
-fn get_ip(cname: String, dns_server: String) {
+
+fn send_query(hostname: String, dns_ip:String, port:u16){
+    let dns = format!("{}:{}", dns_ip, port);
+    let query: Vec<u8> = build_query(hostname);
+
     let socket = UdpSocket::bind("0.0.0.0:34254").expect("couldn't bind to address");
+    socket
+        .send_to(&query, dns)
+        .expect("couldn't send data");
+
+
+    let mut buf = [0; 1024];
+    match socket.recv(&mut buf) {
+        Ok(received) => {
+            let tmp_buff = &buf[..received];
+                println!("{}", deserialize_dns_answer(tmp_buff.to_vec()))
+        },
+        Err(e) => println!("recv function failed: {:?}", e),
+    }
+}
+
+fn build_query(cname: String) -> Vec<u8> {
 
     // Join all headers in a vector of bytes to be sent via UDP.
     let mut bytes = vec![];
@@ -71,7 +95,7 @@ fn get_ip(cname: String, dns_server: String) {
     bytes.push(codes.0);
     bytes.push(codes.1);
 
-    // Two bytes for query quantity, we do 1 only.
+    // Two bytes for query quantity, we do 1 query at a time only.
     let question_qtd = (0x00, 0x01);
     bytes.push(question_qtd.0);
     bytes.push(question_qtd.1);
@@ -84,7 +108,7 @@ fn get_ip(cname: String, dns_server: String) {
     bytes.push(0x00);
 
     // After all headers we need to insert the name being searched.
-    let mut cname_bytes = transform_cname(cname);
+    let mut cname_bytes = transform_cname_for_query(cname);
     bytes.append(&mut cname_bytes);
     
     // Type 1 for A query, looking for host address
@@ -97,22 +121,10 @@ fn get_ip(cname: String, dns_server: String) {
     bytes.push(qclass.0);
     bytes.push(qclass.1);
 
-    socket
-        .send_to(&mut bytes, dns_server)
-        .expect("couldn't send data");
-
-
-    let mut buf = [0; 1024];
-    match socket.recv(&mut buf) {
-        Ok(received) => {
-            let tmp_buff = &buf[..received];
-                println!("{}", deserialize_dns_answer(tmp_buff.to_vec()))
-        },
-        Err(e) => println!("recv function failed: {:?}", e),
-    }
+    return bytes;
 }
 
-fn transform_cname(cname: String) -> Vec<u8> {
+fn transform_cname_for_query(cname: String) -> Vec<u8> {
     let split = cname.split(".");
     let mut bytes = vec![];
 
