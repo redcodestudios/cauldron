@@ -1,5 +1,3 @@
-extern crate bincode;
-
 use std::env;
 use std::net::UdpSocket;
 use std::convert::TryInto;
