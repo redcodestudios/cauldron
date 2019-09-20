@@ -9,7 +9,7 @@ use std::convert::TryInto;
 
 
 // bytes
-const HEADER_SECTION_SIZE: usize = 32; 
+const HEADER_SECTION_SIZE: usize = 12;
 
 const ID_SIZE: usize = 2;
 const FLAGS_SIZE: usize = 2;
@@ -50,7 +50,7 @@ fn main() {
     } else {
         if let Some(hostname) = env::args().nth(1) {
             if let Some(dns_server) = env::args().nth(2) {
-                get_ip(hostname, dns_server);
+                get_ip(hostname, format!("{}:{}", dns_server, 53));
             }
         }
     }
@@ -143,41 +143,45 @@ fn deserialize_dns_answer(bytes: Vec<u8>) -> String {
     let mut pos = ID_SIZE + FLAGS_SIZE + QDCOUNT_SIZE;
     let answers_count = bytes[pos] + bytes[pos+1];
    
-    println!("id {}", (bytes[0] + bytes[ID_SIZE-1]));
-    println!("aaaa {}", answers_count);
-    
-    pos = HEADER_SECTION_SIZE - 1;
-    println!("aaaa {}", pos);
+    pos = HEADER_SECTION_SIZE;
     let mut b = bytes[pos]; 
     
     while b !=0 || pos < HEADER_SECTION_SIZE {
-        println!("aaaa {}", pos);
         pos+=1;
         b = bytes[pos];
     }
-    pos+=1; //skip null cname terminator
-    pos+= QTYPE_SIZE + QCLASS_SIZE; //jump to answer section
+    pos += 1; //skip null cname terminator
+    pos += QTYPE_SIZE + QCLASS_SIZE; //jump to answer section
 
     let mut result = String::from("");
 
     for _ in 0..answers_count {
         pos += NAME_SIZE;
-        let answer_type = (bytes[pos], bytes[pos+1]);
+        let answer_type = bytes[pos] + bytes[pos+1];
         
-        // join two bytes of type and chkeck if is type A
-        if (answer_type.0 + answer_type.1) == 1 {
-            pos += TYPE_SIZE + CLASS_SIZE + TTL_SIZE + DATA_LENGTH_SIZE;
+        // 1 = type A
+        if answer_type == 1 {
+            pos += TYPE_SIZE + CLASS_SIZE + TTL_SIZE;
+            
+            let data_length: usize = (bytes[pos] + bytes[pos+1]).try_into().unwrap();
+            pos += DATA_LENGTH_SIZE;
+            
             let answer = (bytes[pos], bytes[pos+1], bytes[pos+2], bytes[pos+3]);
             result.push_str(
                 format!(
-                    "{}.{}.{}.{}",
+                    "{}.{}.{}.{}\n",
                     answer.0,
                     answer.1,
                     answer.2,
                     answer.3
                 ).as_str()
             );
-            pos += ADDRESS_SIZE;
+            pos += data_length;
+        } else { 
+            // just skip bytes
+            pos += TYPE_SIZE + CLASS_SIZE + TTL_SIZE;
+            let data_length: usize = (bytes[pos]+ bytes[pos+1]).try_into().unwrap();
+            pos += DATA_LENGTH_SIZE + data_length;
         }
     }
     result
